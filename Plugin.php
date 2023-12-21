@@ -4,7 +4,7 @@
  * 
  * @package SpamLite
  * @author YoviSun 陶小桃Blog
- * @version 0.0.1
+ * @version 0.0.2
  * @link http://www.52txr.cn
  */
 
@@ -21,7 +21,7 @@ class SpamLite_Plugin implements Typecho_Plugin_Interface
     public static function config(Typecho_Widget_Helper_Form $form)
     {
         $opt_sensitive_words = new Typecho_Widget_Helper_Form_Element_Radio('opt_sensitive_words',
-            array("none" => "无动作", "waiting" => "待审核", "abandon" => "评论失败"), "none",
+            array("none" => "无动作", "waiting" => "标记为待审核", "abandon" => "评论失败"), "none",
             _t('敏感词汇操作'), "如果评论中包含敏感词汇列表中的词汇，将执行该操作");
         $form->addInput($opt_sensitive_words);
 
@@ -30,9 +30,36 @@ class SpamLite_Plugin implements Typecho_Plugin_Interface
         $form->addInput($words_sensitive);
 
         $opt_no_chinese = new Typecho_Widget_Helper_Form_Element_Radio('opt_no_chinese',
-            array("none" => "无动作", "waiting" => "待审核", "abandon" => "评论失败"), "none",
+            array("none" => "无动作", "waiting" => "标记为待审核", "abandon" => "评论失败"), "none",
             _t('非中文评论操作'), "如果评论中不包含中文，则执行该操作");
         $form->addInput($opt_no_chinese);
+
+        $opt_sensitive_nickname = new Typecho_Widget_Helper_Form_Element_Radio('opt_sensitive_nickname',
+            array("none" => "无动作", "waiting" => "标记为待审核", "abandon" => "评论失败"), "none",
+            _t('敏感昵称操作'), "如果评论者的昵称包含敏感词汇列表中的词汇，将执行该操作");
+        $form->addInput($opt_sensitive_nickname);
+
+        $words_sensitive_nickname = new Typecho_Widget_Helper_Form_Element_Textarea('words_sensitive_nickname', NULL, "",
+            _t('敏感昵称词汇'), _t('多条词汇请用换行符隔开'));
+        $form->addInput($words_sensitive_nickname);
+
+        $opt_sensitive_url = new Typecho_Widget_Helper_Form_Element_Radio('opt_sensitive_url',
+            array("none" => "无动作", "waiting" => "标记为待审核", "abandon" => "评论失败"), "none",
+            _t('敏感网址操作'), "如果评论者的网址包含敏感词汇列表中的词汇，将执行该操作");
+        $form->addInput($opt_sensitive_url);
+
+        $words_sensitive_url = new Typecho_Widget_Helper_Form_Element_Textarea('words_sensitive_url', NULL, "",
+            _t('敏感网址词汇'), _t('多条词汇请用换行符隔开'));
+        $form->addInput($words_sensitive_url);
+
+        $opt_sensitive_email = new Typecho_Widget_Helper_Form_Element_Radio('opt_sensitive_email',
+            array("none" => "无动作", "waiting" => "标记为待审核", "abandon" => "评论失败"), "none",
+            _t('敏感邮箱操作'), "如果评论者的邮箱包含敏感词汇列表中的词汇，将执行该操作");
+        $form->addInput($opt_sensitive_email);
+
+        $words_sensitive_email = new Typecho_Widget_Helper_Form_Element_Textarea('words_sensitive_email', NULL, "",
+            _t('敏感邮箱词汇'), _t('多条词汇请用换行符隔开'));
+        $form->addInput($words_sensitive_email);
     }
 
     public static function personalConfig(Typecho_Widget_Helper_Form $form){}
@@ -62,28 +89,60 @@ class SpamLite_Plugin implements Typecho_Plugin_Interface
             }
         }
 
-        // 执行操作
-        if ($opt == "abandon") {
-            Typecho_Cookie::set('__typecho_remember_text', $comment['text']);
-            throw new Typecho_Widget_Exception($error);
-        } else if ($opt == "waiting") {
-            $comment['status'] = 'waiting';
+        // 检查敏感昵称
+        if ($opt == "none" && $filter_set->opt_sensitive_nickname != "none") {
+            if (SpamLite_Plugin::check_in($filter_set->words_sensitive_nickname, $comment['author'])) {
+                $error = "评论者的昵称包含敏感词汇";
+                $opt = $filter_set->opt_sensitive_nickname;
+            }
         }
-        Typecho_Cookie::delete('__typecho_remember_text');
-        return $comment;
+        
+        // 检查敏感网址
+        if ($opt == "none" && $filter_set->opt_sensitive_url != "none" && !empty($comment['url'])) {
+            if (SpamLite_Plugin::check_in($filter_set->words_sensitive_url, $comment['url'])) {
+                $error = "评论者的网址包含敏感词汇";
+                $opt = $filter_set->opt_sensitive_url;
+            }
+        }
+
+        // 检查敏感邮箱
+        if ($opt == "none" && $filter_set->opt_sensitive_email != "none" && !empty($comment['mail'])) {
+            if (SpamLite_Plugin::check_in($filter_set->words_sensitive_email, $comment['mail'])) {
+                $error = "评论者的邮箱包含敏感词汇";
+                $opt = $filter_set->opt_sensitive_email;
+            }
+        }
+
+        // 根据处理结果执行相应操作
+        switch ($opt) {
+            case "waiting":
+                $comment['status'] = 'waiting';
+                $comments = $comment;
+                break;
+            case "abandon":
+                $error = empty($error) ? "评论失败" : $error;
+                throw new Typecho_Widget_Exception(_t($error));
+                break;
+            default:
+                break;
+        }
+
+        return $comments;
     }
 
-    private static function check_in($words_str, $str)
+    // 检查字符串中是否包含关键词
+    public static function check_in($needles, $haystack)
     {
-        $words = explode("\n", $words_str);
-        if (empty($words)) {
-            return false;
-        }
-        foreach ($words as $word) {
-            if (false !== strpos($str, trim($word))) {
+        $needles = explode("\n", $needles);
+        foreach ($needles as $needle) {
+            $needle = trim($needle);
+            if ($needle != '' && strpos($haystack, $needle) !== false) {
                 return true;
             }
         }
         return false;
     }
-}
+}        
+        
+        
+        
