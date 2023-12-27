@@ -20,7 +20,9 @@
 我的博客环境：Typecho1.2.1、PHP8.2、HandSome9.0.2
 
 
-这里我也给了蓝奏云的下载链接：[SpamLite插件 -蓝奏云下载](https://wwtx.lanzout.com/iJ0PA1ifu5qb)
+这里我也给了蓝奏云的下载链接：
+[SpamLite插件v0.02 -蓝奏云下载](https://wwtx.lanzout.com/ilN0t1ilgufc)
+[SpamLite插件v0.01 -蓝奏云下载](https://wwtx.lanzout.com/iJ0PA1ifu5qb)
 
 
 ## 插件使用
